@@ -13,6 +13,7 @@ class sun_dataset (torch.utils.data.Dataset):
         super().__init__()
         self.df = pd.read_csv(txt_file, header=None, sep=' ')
         self.transform = transform
+        print('Loading from %s' % txt_file)
         
     def __len__ (self):
         return len(self.df)
@@ -28,7 +29,8 @@ class sun_dataset (torch.utils.data.Dataset):
         return image, label
     
        
-def train_model (model, loss_function, optimizer, scheduler, num_epochs, model_id=None):
+def train_model (model, dataloaders, dataset_sizes, batch_size, num_classes, loss_function, 
+                 optimizer, scheduler, num_epochs, device, display_step, model_id=None):
     
     # Deep copy model weights
     best_model_weights = copy.deepcopy(model.state_dict())
@@ -49,7 +51,10 @@ def train_model (model, loss_function, optimizer, scheduler, num_epochs, model_i
                 model.eval()
                 
             running_loss = 0.0
-            running_correct = 0
+            running_correct_total = 0
+            
+            class_correct = [0. for i in range(num_classes)]
+            class_total = [0. for i in range(num_classes)]
             
             # Iterate over data
             for inputs, labels in dataloaders[phase]:
@@ -73,25 +78,33 @@ def train_model (model, loss_function, optimizer, scheduler, num_epochs, model_i
                         optimizer.step()
                         training_step += 1
                         
-                        if training_step % DISPLAY_STEP == 0:
+                        if training_step % display_step == 0:
                             minibatch_loss = loss.item()
-                            minibatch_acc = (preds == labels).sum().item() / BATCH_SIZE
-                            print('Epoch: %d, Step: %5d, Minibatch_loss: %.3f, Minibatch_accuracy: %.3f' 
+                            minibatch_acc = (preds == labels).sum().item() / batch_size
+                            print('Epoch: %d, Step: %5d, Minibatch_loss: %.3f, Minibatch_accuracy_micro: %.3f' 
                                   % (epoch, training_step, minibatch_loss, minibatch_acc))
                         
                 # Record loss and correct predictions
+                correct_tensor = (preds == labels).squeeze()
                 running_loss += loss.item() * inputs.shape[0]
-                running_correct += (preds == labels).sum().item()
+                running_correct_total += correct_tensor.sum().item()
                 
+                for i in range(batch_size):
+                    label = labels[i]
+                    class_correct[label] += correct_tensor[i].item()
+                    class_total[label] += 1
+                
+            # Epoch loss and accuracies
             epoch_loss = running_loss / dataset_sizes[phase]
-            epoch_acc = running_correct / dataset_sizes[phase]
+            epoch_acc_mic = running_correct_total / dataset_sizes[phase]
+            epoch_acc_mac = (class_correct[i] / class_total[i]).mean()
             
-            print('Epoch: %d, Phase: %s, Epoch_loss: %.3f, Epoch_accuracy: %.3f' 
-                  % (epoch, phase, epoch_loss, epoch_acc))
+            print('Epoch: %d, Phase: %s, Epoch_loss: %.3f, Epoch_accuracy_micro: %.3f, Epoch_accuracy_micro: %.3f' 
+                  % (epoch, phase, epoch_loss, epoch_acc_mic, epoch_acc_mac))
             
             # Deep copy the best model weights
-            if phase == 'val' and epoch_acc > best_acc:
-                best_acc = epoch_acc
+            if phase == 'val' and epoch_acc_mic > best_acc:
+                best_acc = epoch_acc_mic
                 best_model_weights = copy.deepcopy(model.state_dict())
                 
     print()

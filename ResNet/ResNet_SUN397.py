@@ -9,13 +9,19 @@ import matplotlib.pyplot as plt
 import os
 import pandas as pd
 import copy
+import argparse
 from PIL import Image
 from util import *
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--model_id', default='plain', type=str)
+args = parser.parse_args()
+
 
 # ============================================
 # Misc
 LOG_DIR = './log'
-MODEL_ID = 'plain'
+MODEL_ID = args.model_id
 DATALOADER_WORKERS = 4
 LEARNING_RATE = 0.01
 LR_DECAY_FACTOR = 0.1
@@ -28,12 +34,16 @@ NUM_CLASSES = 397
 
 if not os.path.isdir(LOG_DIR):
     os.makedirs(LOG_DIR)
-    
+
+print('model_id: %s' % MODEL_ID)
+
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 
 
 # ============================================
+# Dataset Preparation
+
 # transforms.RandomResizeCrop(224)
 data_transforms = {
     'train': transforms.Compose([
@@ -56,7 +66,7 @@ data_transforms = {
 
 print('Load datasets.')
 
-datasets = {x: sun_dataset(txt_file='./plain/sun397_%s_lt.txt' % x, transform=data_transforms[x]) 
+datasets = {x: sun_dataset(txt_file='./%s_txt/sun397_%s_lt.txt' % (MODEL_ID, x), transform=data_transforms[x]) 
             for x in ['train', 'val', 'test']} 
 dataloaders = {x: torch.utils.data.DataLoader(datasets[x], batch_size=BATCH_SIZE, shuffle=True, num_workers=DATALOADER_WORKERS) 
                for x in ['train', 'val', 'test']}
@@ -67,13 +77,15 @@ print('Done.')
 
 
 # ============================================
+# Model Preparation
+
 # Load pretrained model
 print('Load pretrained ResNet.')
 resnet = torchvision.models.resnet152(pretrained=True)
 # Freeze all layers
 for param in resnet.parameters():
     param.requires_grad = False
-    
+
 print('Done.')    
 
 # Reset the fc layer
@@ -91,7 +103,13 @@ optimizer = optim.SGD(resnet.fc.parameters(), lr=LEARNING_RATE, momentum=MOMENTU
 # Decay LR by a factor of 0.1 every 30 epochs
 exp_lr_scheduler = lr_scheduler.StepLR(optimizer, step_size=LR_DECAY_EPOCHS, gamma=LR_DECAY_FACTOR)
 
+
+
 # ============================================
-# Train
+# Training
 print('Start training')
-resnet = train_model(model=resnet, loss_function=loss_function, optimizer=optimizer, scheduler=exp_lr_scheduler, num_epochs=EPOCHS, model_id=MODEL_ID)
+resnet = train_model(model=resnet, dataloaders=dataloaders, batch_size=BATCH_SIZE,
+                     dataset_sizes=dataset_sizes, num_classes=NUM_CLASSES, loss_function=loss_function, 
+                     optimizer=optimizer, scheduler=exp_lr_scheduler, 
+                     device=device, num_epochs=EPOCHS, display_step=DISPLAY_STEP,
+                     model_id=MODEL_ID)
