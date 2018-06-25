@@ -144,9 +144,9 @@ def train_model (model, dataloaders, dataset_sizes, batch_size, num_classes, los
                   % (epoch, num_epochs, phase, epoch_loss, epoch_acc_mic, epoch_acc_mac))
             
             # Deep copy the best model weights
-            if phase == 'val' and epoch_acc_mic > best_acc:
+            if phase == 'val' and epoch_acc_mac > best_acc:
                 best_epoch = epoch
-                best_acc = epoch_acc_mic
+                best_acc = epoch_acc_mac
                 best_model_weights = copy.deepcopy(model.state_dict())
                 
     print()
