@@ -22,6 +22,7 @@ parser.add_argument('--dropout', default=False)
 parser.add_argument('--dropout_rate', default=0.5, type=float)
 parser.add_argument('--fc_add_dim', default=4096, type=int)
 parser.add_argument('--caffe_weights', default=False)
+parser.add_argument('--bias', default=False)
 args = parser.parse_args()
 
 
@@ -43,6 +44,7 @@ BATCH_SIZE = 256
 DISPLAY_STEP = 10
 NUM_CLASSES = 397
 CAFFE_WEIGHTS = args.caffe_weights
+BIAS = args.bias
 
 if not os.path.isdir(LOG_DIR):
     os.makedirs(LOG_DIR)
@@ -108,14 +110,14 @@ print('Done.')
 
 if DROPOUT:
     print('Model using dropout.')
-    resnet = MyResNet(resnet, NUM_CLASSES, DROPOUT_RATE, FC_ADD_DIM)
+    resnet = MyResNet(resnet, NUM_CLASSES, DROPOUT_RATE, FC_ADD_DIM, bias=BIAS)
     # Optimizer only on the last fc layers
     optimizer = optim.SGD(list(resnet.fc.parameters()) + list(resnet.fc_add.parameters()), lr=LEARNING_RATE, momentum=MOMENTUM)
 else:
     print('Model not using dropout.')
     # Reset the fc layer
     num_features = resnet.fc.in_features
-    resnet.fc = nn.Linear(num_features, NUM_CLASSES)
+    resnet.fc = nn.Linear(num_features, NUM_CLASSES, bias=BIAS)
     # Optimizer only on the last fc layers
     optimizer = optim.SGD(list(resnet.fc.parameters()), lr=LEARNING_RATE, momentum=MOMENTUM)
 

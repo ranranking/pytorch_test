@@ -34,17 +34,18 @@ class sun_dataset (torch.utils.data.Dataset):
     
 class MyResNet (nn.Module):
     
-    def __init__ (self, pretrained_resnet, num_classes, drop_rate, fc_add_dim):
+    def __init__ (self, pretrained_resnet, num_classes, drop_rate, fc_add_dim, bias):
         super().__init__()
         self.pretrained_resnet = pretrained_resnet
         
         # Reset the fc layer
         self.num_features = self.pretrained_resnet.fc.in_features
         
-        self.fc_add = nn.Linear(self.num_features, fc_add_dim)
+        self.fc_add = nn.Linear(self.num_features, fc_add_dim, bias=bias)
         self.dropout = nn.Dropout(p=drop_rate)
-        self.fc = nn.Linear(fc_add_dim, num_classes)
+        self.fc = nn.Linear(fc_add_dim, num_classes, bias)
         
+        print('Bias is %s' % bias)
         print('Intermediate fc dimension is: %d' % fc_add_dim)
         print('Dropout rate is: %f' % drop_rate)
         
