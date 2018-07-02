@@ -23,6 +23,7 @@ parser.add_argument('--dropout_rate', default=0.5, type=float)
 parser.add_argument('--fc_add_dim', default=4096, type=int)
 parser.add_argument('--caffe_weights', default=False)
 parser.add_argument('--bias', default=False)
+parser.add_argument('--class_aware', default=False)
 args = parser.parse_args()
 
 
@@ -31,7 +32,7 @@ args = parser.parse_args()
 LOG_DIR = './log'
 DATASET = args.dataset
 MODEL_ID = args.model_id
-DATALOADER_WORKERS = 4
+DATALOADER_WORKERS = 8
 LEARNING_RATE = 0.01
 LR_DECAY_FACTOR = 0.1
 LR_DECAY_EPOCHS = args.decay_epoch
@@ -45,6 +46,7 @@ DISPLAY_STEP = 10
 NUM_CLASSES = 397
 CAFFE_WEIGHTS = args.caffe_weights
 BIAS = args.bias
+CLASS_AWARE = args.class_aware
 
 if not os.path.isdir(LOG_DIR):
     os.makedirs(LOG_DIR)
@@ -78,8 +80,19 @@ print('Load datasets.')
 
 datasets = {x: sun_dataset(txt_file='./%s_txt/sun397_%s_lt.txt' % (DATASET, x), transform=data_transforms[x]) 
             for x in ['train', 'val']} 
-dataloaders = {x: torch.utils.data.DataLoader(datasets[x], batch_size=BATCH_SIZE, shuffle=True, num_workers=DATALOADER_WORKERS) 
-               for x in ['train', 'val']}
+if CLASS_AWARE:
+    print('Using class-aware sampling.')
+    dataloaders = {'train':torch.utils.data.DataLoader(datasets['train'], batch_size=BATCH_SIZE,
+                                                       shuffle=False, num_workers=DATALOADER_WORKERS,
+                                                       sampler=ClassAwareSampler(data_source=datasets['train'],
+                                                                                 num_classes=NUM_CLASSES)),
+                   'val':torch.utils.data.DataLoader(datasets['val'], batch_size=BATCH_SIZE,
+                                                     shuffle=True, num_workers=DATALOADER_WORKERS)}
+else:
+    print('Not using class-aware sampling.')
+    dataloaders = {x: torch.utils.data.DataLoader(datasets[x], batch_size=BATCH_SIZE,
+                                                  shuffle=True, num_workers=DATALOADER_WORKERS) 
+                   for x in ['train', 'val']}
 dataset_sizes = {x: len(datasets[x]) for x in ['train', 'val']}
 
 print('Done.')
@@ -129,7 +142,13 @@ print('Learning rate decay epoch: %s' % LR_DECAY_EPOCHS)
 print('Learning rate decay factor: %s' % LR_DECAY_FACTOR)
 exp_lr_scheduler = lr_scheduler.StepLR(optimizer, step_size=LR_DECAY_EPOCHS, gamma=LR_DECAY_FACTOR)
 
+if torch.cuda.device_count() > 1:
+  print("Using", torch.cuda.device_count(), "GPUs.")
+  resnet = nn.DataParallel(resnet)
+
 resnet = resnet.to(device)
+
+
 
 
 

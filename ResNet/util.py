@@ -8,6 +8,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data
+from torch.utils.data.sampler import Sampler
+import random
 
 
 class sun_dataset (torch.utils.data.Dataset):
@@ -168,3 +170,55 @@ def train_model (model, dataloaders, dataset_sizes, batch_size, num_classes, los
     torch.save(model_states, os.path.join(log_dir, 'model_%s_checkpoint.pth.tar' % model_id))
     
     return model
+
+
+##################################
+## Class-aware sampling, partly implemented by frombeijingwithlove
+
+class RandomCycleIter:
+    
+    def __init__ (self, data):
+        self.data_list = list(data)
+        self.length = len(self.data_list)
+        self.i = self.length - 1
+        
+    def __iter__ (self):
+        return self
+    
+    def __next__ (self):
+        self.i += 1
+        
+        if self.i == self.length:
+            self.i = 0
+            random.shuffle(self.data_list)
+            
+        return self.data_list[self.i]
+    
+def class_aware_sample_generator (cls_iter, data_iter_list, n):
+    
+    i = 0
+    
+    while i < n:
+        yield next(data_iter_list[next(cls_iter)])
+        i += 1
+        
+class ClassAwareSampler (Sampler):
+    
+    def __init__ (self, data_source, num_classes, num_samples=0):
+        
+        self.data_source = data_source
+        self.class_iter = RandomCycleIter(range(num_classes))
+        class_data_list = [[] for _ in range(num_classes)]
+        
+        for idx, row in self.data_source.df.iterrows():
+            class_data_list[row[1] - 1].append(idx) 
+            
+        self.data_iter_list = [RandomCycleIter(x) for x in class_data_list]
+        
+        self.num_samples = max([len(x) for x in class_data_list]) * len(class_data_list)
+        
+    def __iter__ (self):
+        return class_aware_sample_generator(self.class_iter, self.data_iter_list, self.num_samples)
+    
+    def __len__ (self):
+        return self.num_samples
