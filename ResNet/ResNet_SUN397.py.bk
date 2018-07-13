@@ -5,6 +5,7 @@ from torch.optim import lr_scheduler
 import numpy as np
 import torchvision
 from torchvision import datasets, models, transforms
+import matplotlib.pyplot as plt
 import os
 import pandas as pd
 import copy
@@ -13,7 +14,6 @@ from PIL import Image
 from util import *
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--log', default='./log', type=str)
 parser.add_argument('--dataset', default='plain', type=str)
 parser.add_argument('--epoch', default=10, type=int)
 parser.add_argument('--batch_size', default=256, type=int)
@@ -26,16 +26,13 @@ parser.add_argument('--caffe_weights', default=False)
 parser.add_argument('--bias', default=False)
 parser.add_argument('--class_aware', default=False)
 parser.add_argument('--save_final', default=False)
-parser.add_argument('--epoch_log', default=False)
-parser.add_argument('--model', default='resnet152', type=str)
 args = parser.parse_args()
 
 
 # ============================================
 # Misc
-LOG_DIR = args.log
+LOG_DIR = './log'
 DATASET = args.dataset
-MODEL = args.model
 MODEL_ID = args.model_id
 DATALOADER_WORKERS = 8
 LEARNING_RATE = 0.01
@@ -53,7 +50,6 @@ CAFFE_WEIGHTS = args.caffe_weights
 BIAS = args.bias
 CLASS_AWARE = args.class_aware
 SAVE_FINAL = args.save_final
-EPOCH_LOG = args.epoch_log
 
 if not os.path.isdir(LOG_DIR):
     os.makedirs(LOG_DIR)
@@ -113,51 +109,34 @@ print('Done.')
 print('Load pretrained ResNet.')
 
 # Load pretrained model
-if MODEL == 'resnet152':
-    print('Using resnet 152.')
-    if CAFFE_WEIGHTS:
-        print('Model using caffe pretrained weights.')
-        resnet = torchvision.models.resnet152(pretrained=False)
-        weights = torch.load('./caffe_weights/resnet152.pth')
-        resnet.load_state_dict(weights)
-    else:
-        print('Model using pytorch pretrained weights.')
-        resnet = torchvision.models.resnet152(pretrained=True)
+if CAFFE_WEIGHTS:
+    print('Model using caffe pretrained weights.')
+    resnet = torchvision.models.resnet152(pretrained=False)
+    weights = torch.load('./caffe_weights/resnet152.pth')
+    resnet.load_state_dict(weights)
+else:
+    print('Model using pytorch pretrained weights.')
+    resnet = torchvision.models.resnet152(pretrained=True)
 
-    # Freeze all layers
-    for param in resnet.parameters():
-        param.requires_grad = False
-        
-elif MODEL == 'resnet50':
-    print('Using resnet 50')
-    if CAFFE_WEIGHTS:
-        print('Model using caffe pretrained weights.')
-        resnet = torchvision.models.resnet50(pretrained=False)
-        weights = torch.load('./caffe_weights/resnet50.pth')
-        resnet.load_state_dict(weights)
-    else:
-        print('Model using pytorch pretrained weights.')
-        resnet = torchvision.models.resnet152(pretrained=True)
-print('Done.')  
+# Freeze all layers
+for param in resnet.parameters():
+    param.requires_grad = False
+
+print('Done.')    
+
 
 if DROPOUT:
     print('Model using dropout.')
     resnet = MyResNet(resnet, NUM_CLASSES, DROPOUT_RATE, FC_ADD_DIM, bias=BIAS)
-    if MODEL == 'resnet152':
-        # Optimizer only on the last fc layers
-        optimizer = optim.SGD(list(resnet.fc.parameters()) + list(resnet.fc_add.parameters()), lr=LEARNING_RATE, momentum=MOMENTUM)
-    elif MODEL == 'resnet50':
-        optimizer = optim.SGD(resnet.parameters(), lr=LEARNING_RATE, momentum=MOMENTUM)
+    # Optimizer only on the last fc layers
+    optimizer = optim.SGD(list(resnet.fc.parameters()) + list(resnet.fc_add.parameters()), lr=LEARNING_RATE, momentum=MOMENTUM)
 else:
     print('Model not using dropout.')
     # Reset the fc layer
     num_features = resnet.fc.in_features
     resnet.fc = nn.Linear(num_features, NUM_CLASSES, bias=BIAS)
-    if MODEL == 'resnet152':
-        # Optimizer only on the last fc layers
-        optimizer = optim.SGD(list(resnet.fc.parameters()), lr=LEARNING_RATE, momentum=MOMENTUM)
-    elif MODEL == 'resnet50':
-        optimizer = optim.SGD(resnet.parameters(), lr=LEARNING_RATE, momentum=MOMENTUM)
+    # Optimizer only on the last fc layers
+    optimizer = optim.SGD(list(resnet.fc.parameters()), lr=LEARNING_RATE, momentum=MOMENTUM)
 
 # Loss function 
 loss_function = nn.CrossEntropyLoss()
@@ -179,9 +158,9 @@ resnet = resnet.to(device)
 
 # ============================================
 # Training
-print('Start training')
-resnet = train_model(model=resnet, dataloaders=dataloaders, batch_size=BATCH_SIZE,
-                     dataset_sizes=dataset_sizes, num_classes=NUM_CLASSES, loss_function=loss_function, 
-                     optimizer=optimizer, scheduler=exp_lr_scheduler, 
-                     device=device, num_epochs=EPOCHS, display_step=DISPLAY_STEP,
-                     log_dir=LOG_DIR, model_id=MODEL_ID, save_final=SAVE_FINAL, epoch_log=EPOCH_LOG)
+#print('Start training')
+#resnet = train_model(model=resnet, dataloaders=dataloaders, batch_size=BATCH_SIZE,
+#                     dataset_sizes=dataset_sizes, num_classes=NUM_CLASSES, loss_function=loss_function, 
+#                     optimizer=optimizer, scheduler=exp_lr_scheduler, 
+#                     device=device, num_epochs=EPOCHS, display_step=DISPLAY_STEP,
+#                     log_dir=LOG_DIR, model_id=MODEL_ID, save_final=SAVE_FINAL)

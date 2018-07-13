@@ -3,6 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 from PIL import Image
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -76,7 +77,6 @@ def train_model (model, dataloaders, dataset_sizes, batch_size, num_classes, los
     
     print('Saving final model: %s' % save_final)
     print('log dir: %s' % log_dir)
-    print('log every 5 epochs: %s' % epoch_log)
     
     # Deep copy model weights
     best_model_weights = copy.deepcopy(model.state_dict())
