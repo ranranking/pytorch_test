@@ -137,7 +137,7 @@ elif MODEL == 'resnet50':
         resnet.load_state_dict(weights)
     else:
         print('Model using pytorch pretrained weights.')
-        resnet = torchvision.models.resnet152(pretrained=True)
+        resnet = torchvision.models.resnet50(pretrained=True)
 print('Done.')  
 
 if DROPOUT:
